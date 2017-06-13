@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+	<title>Rigid body - Physijs</title>
+
+	<link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+	<script type="text/javascript" src="js/three.min.js"></script>
+	<script type="text/javascript" src="js/stats.js"></script>
+	<script type="text/javascript" src="js/simplex-noise.js"></script>
+	<script type="text/javascript" src="../physi.js"></script>
+
+	<script type="text/javascript">
+
+	'use strict';
+
+	Physijs.scripts.worker = '../physijs_worker.js';
+	Physijs.scripts.ammo = 'examples/js/ammo.js';
+
+	var initScene, render,
+		ground_material, box_material,
+		renderer, render_stats, physics_stats, scene, ground, light, camera,
+			vehicle_body, vehicle, loader, x;
+
+	initScene = function() {
+		renderer = new THREE.WebGLRenderer({ antialias: true });
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		renderer.shadowMap.enabled = true;
+		renderer.shadowMapSoft = true;
+		document.getElementById( 'viewport' ).appendChild( renderer.domElement );
+
+		render_stats = new Stats();
+		render_stats.domElement.style.position = 'absolute';
+		render_stats.domElement.style.top = '1px';
+		render_stats.domElement.style.zIndex = 100;
+		document.getElementById( 'viewport' ).appendChild( render_stats.domElement );
+
+		physics_stats = new Stats();
+		physics_stats.domElement.style.position = 'absolute';
+		physics_stats.domElement.style.top = '50px';
+		physics_stats.domElement.style.zIndex = 100;
+		document.getElementById( 'viewport' ).appendChild( physics_stats.domElement );
+
+		scene = new Physijs.Scene;
+		scene.setGravity(new THREE.Vector3( 0, -20, 0 ));
+		scene.addEventListener(
+			'update',
+			function() {
+
+				if ( input && vehicle ) {
+					if ( input.direction !== null ) {
+						input.steering += input.direction / 50;
+						if ( input.steering < -.2) input.steering = -.2;
+						if ( input.steering > .2 ) input.steering = .2;
+					}
+					vehicle.setSteering( input.steering, 0 );
+					vehicle.setSteering( input.steering, 1 );
+
+					if ( input.power === true ) {
+						vehicle.applyEngineForce( 300 );
+					} else if ( input.power === false ) {
+						vehicle.applyEngineForce( -100 );
+
+					} else if (input.power == 1){
+      			vehicle.applyEngineForce( 1000 );
+     			} else if (x){
+						vehicle.setBrake( 20, 2 );
+						vehicle.setBrake( 20, 3 );
+     }
+				}
+
+				scene.simulate( undefined, 2 );
+				physics_stats.update();
+			}
+		);
+
+		camera = new THREE.PerspectiveCamera(
+			60,
+			window.innerWidth / window.innerHeight,
+			1,
+			1000
+		);
+
+		scene.add( camera );
+
+
+		// Light
+		light = new THREE.DirectionalLight( 0xFFFFFF );
+		light.position.set( 50, 50, -15 );
+		light.target.position.copy( scene.position );
+		light.castShadow = true;
+		light.shadowCameraLeft = -450;
+		light.shadowCameraTop = -450;
+		light.shadowCameraRight = 450;
+		light.shadowCameraBottom = 450;
+		light.shadowCameraNear = 10;
+		light.shadowCameraFar = 800;
+		light.shadowBias = -.0001
+		light.shadowMapWidth = light.shadowMapHeight = 2048;
+		light.shadowDarkness = .7;
+		scene.add( light );
+
+
+
+
+		var input;
+
+		// Loader
+		loader = new THREE.TextureLoader();
+
+		// Materials
+		ground_material = Physijs.createMaterial(
+			new THREE.MeshLambertMaterial({ map: loader.load( 'images/asphalt.jpg' ) }),
+			.6, // high friction
+			.4 // low restitution
+		);
+		ground_material.map.wrapS = ground_material.map.wrapT = THREE.RepeatWrapping;
+		ground_material.map.repeat.set( 8, 8 );
+
+		box_material = Physijs.createMaterial(
+			new THREE.MeshLambertMaterial({ map: loader.load( 'images/house.jpg' ) }),
+			.4, // low friction
+			.6 // high restitution
+		);
+		box_material.map.wrapS = ground_material.map.wrapT = THREE.RepeatWrapping;
+		box_material.map.repeat.set( 1, 1 );
+
+		// Ground
+		var NoiseGen = new SimplexNoise;
+
+		var ground_geometry = new THREE.PlaneGeometry( 600, 600, 100, 100 );
+		for ( var i = 0; i < ground_geometry.vertices.length; i++ ) {
+			var vertex = ground_geometry.vertices[i];
+		}
+		ground_geometry.computeFaceNormals();
+		ground_geometry.computeVertexNormals();
+
+		// If your plane is not square as far as face count then the HeightfieldMesh
+		// takes two more arguments at the end: # of x faces and # of z faces that were passed to THREE.PlaneMaterial
+		ground = new Physijs.HeightfieldMesh(
+				ground_geometry,
+				ground_material,
+				0 // mass
+		);
+		ground.rotation.x = -Math.PI / 2;
+		ground.receiveShadow = true;
+		scene.add( ground );
+
+
+
+		var bumper,
+			bumper_geom = new THREE.BoxGeometry(10, 30, 10);
+
+		bumper = new Physijs.BoxMesh( bumper_geom, box_material, 0, { restitution: .2 } );
+		bumper.position.x = 20;
+		bumper.receiveShadow = true;
+		bumper.castShadow = true;
+		scene.add( bumper );
+
+		bumper = new Physijs.BoxMesh( bumper_geom, box_material, 0, { restitution: .2 } );
+		bumper.position.x = 20;
+		bumper.position.z = 50;
+		bumper.receiveShadow = true;
+		bumper.castShadow = true;
+		scene.add( bumper );
+
+		bumper = new Physijs.BoxMesh( bumper_geom, box_material, 0, { restitution: .2 } );
+		bumper.position.x = 100;
+		bumper.position.z = 50;
+		bumper.receiveShadow = true;
+		bumper.castShadow = true;
+		scene.add( bumper );
+
+		bumper = new Physijs.BoxMesh( bumper_geom, box_material, 0, { restitution: .2 } );
+		bumper.position.y = 0;
+		bumper.position.x = 100;
+		bumper.position.z = 150;
+		bumper.receiveShadow = true;
+		bumper.castShadow = true;
+		scene.add( bumper );
+
+		bumper = new Physijs.BoxMesh( bumper_geom, box_material, 0, { restitution: .2 } );
+		bumper.position.y = 0;
+		bumper.position.x = -60;
+		bumper.position.z = 100;
+		bumper.scale.y = 2;
+		bumper.receiveShadow = true;
+		bumper.castShadow = true;
+		scene.add( bumper );
+
+
+
+		var json_loader = new THREE.JSONLoader();
+
+		json_loader.load( "models/mustang.js", function( car, car_materials ) {
+			json_loader.load( "models/mustang_wheel.js", function( wheel, wheel_materials ) {
+				var mesh = new Physijs.BoxMesh(
+					car,
+					new THREE.MeshFaceMaterial( car_materials )
+				);
+				mesh.position.y = 2;
+				mesh.castShadow = mesh.receiveShadow = true;
+
+				vehicle = new Physijs.Vehicle(mesh, new Physijs.VehicleTuning(
+					15, //strength - stifness
+					0.7, //height/stifness - compression - floatiness
+					0.3, //stifness?? - damping
+					500, //wheel y position - max travel
+					10, // friction
+					6000 // max force
+				));
+				scene.add( vehicle );
+
+				var wheel_material = new THREE.MeshFaceMaterial( wheel_materials );
+
+				for ( var i = 0; i < 4; i++ ) {
+					vehicle.addWheel(
+						wheel,
+						wheel_material,
+						new THREE.Vector3(
+								i % 2 === 0 ? -1.6 : 1.6,
+								-1,
+								i < 2 ? 3.3 : -3.2
+						),
+						new THREE.Vector3( 0, -1, 0 ),
+						new THREE.Vector3( -1, 0, 0 ),
+						0.8, // suspension height
+						0.8, // radius
+						i < 2 ? false : true // steering wheels
+					);
+				}
+
+				input = {
+					power: null,
+					direction: null,
+					steering: 0
+				};
+				document.addEventListener('keydown', function( ev ) {
+					switch ( ev.keyCode ) {
+						case 37: // left
+							input.direction = 1;
+							break;
+
+						case 38: // forward
+							input.power = true;
+							break;
+
+						case 39: // right
+							input.direction = -1;
+							break;
+
+						case 40: // back
+							input.power = false;
+							break;
+						case 82: // back
+	     				input.power = 1;
+	       			break;
+					}
+				});
+				document.addEventListener('keyup', function( ev ) {
+					switch ( ev.keyCode ) {
+						case 37: // left
+							input.direction = null;
+							break;
+
+						case 38: // forward
+							input.power = null;
+							break;
+
+						case 39: // right
+							input.direction = null;
+							break;
+
+						case 40: // back
+							input.power = null;
+							break;
+						case 82: // back
+							input.power = null;
+							break;
+					}
+				});
+			});
+		});
+
+		requestAnimationFrame( render );
+		scene.simulate();
+	};
+
+	render = function() {
+		requestAnimationFrame( render );
+		if ( vehicle ) {
+			camera.rotation.copy( vehicle.mesh.rotation );
+			camera.position.copy( vehicle.mesh.position ).add( new THREE.Vector3( 0, 1.6, 0 ) );
+			camera.rotateY(Math.PI);
+
+
+
+
+		}
+		renderer.render( scene, camera );
+		render_stats.update();
+	};
+
+	window.onload = initScene;
+
+	</script>
+</head>
+
+<body>
+	<div id="viewport"></div>
+</body>
+
+</html>
